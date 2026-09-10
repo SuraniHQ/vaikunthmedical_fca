@@ -144,13 +144,11 @@ required_apps = ["erpnext"]
 # ---------------
 # Hook on document methods and events
 
-# doc_events = {
-# 	"*": {
-# 		"on_update": "method",
-# 		"on_cancel": "method",
-# 		"on_trash": "method"
-# 	}
-# }
+doc_events = {
+	"Company": {
+		"validate": "vaikunthmedical_fca.branding.set_company_logo",
+	}
+}
 
 # Scheduled Tasks
 # ---------------
