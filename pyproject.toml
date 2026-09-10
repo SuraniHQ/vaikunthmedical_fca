@@ -1,7 +1,7 @@
 [project]
 name = "vaikunthmedical_fca"
 authors = [
-    { name = "Vaikunthmedical", email = "harsh.surani@satat.tech"}
+    { name = "Vaikunthmedical", email = "harshsurani00@gmail.com"}
 ]
 description = "Custom app for Vaikunthmedical Pharmacy customisations"
 requires-python = ">=3.14"

@@ -2,13 +2,13 @@ app_name = "vaikunthmedical_fca"
 app_title = "Vaikunthmedical Fca"
 app_publisher = "Vaikunthmedical"
 app_description = "Custom app for Vaikunthmedical Pharmacy customisations"
-app_email = "harsh.surani@satat.tech"
+app_email = "harshsurani00@gmail.com"
 app_license = "mit"
 
 # Apps
 # ------------------
 
-# required_apps = []
+required_apps = ["erpnext"]
 
 # Each item in the list will be shown as an app in the apps page
 # add_to_apps_screen = [
