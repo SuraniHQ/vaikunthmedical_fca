@@ -8,3 +8,4 @@ vaikunthmedical_fca.patches.v1_0.create_rack_shelf_inventory_dimensions
 vaikunthmedical_fca.patches.v1_1.set_default_branding_logo
 vaikunthmedical_fca.patches.v1_2.add_grn_expiry_and_mrp_fields
 vaikunthmedical_fca.patches.v1_3.default_to_simple_batch_entry_on_grn
+vaikunthmedical_fca.patches.v1_4.simplify_grn_batch_and_mrp_fields
