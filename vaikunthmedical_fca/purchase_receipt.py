@@ -2,15 +2,30 @@ import frappe
 from frappe.utils import flt
 
 
+def snapshot_typed_batch_no(doc, method=None):
+	"""Core's set_missing_item_details() (part of the base validate() chain)
+	overwrites a manually typed Batch No back to blank whenever
+	use_serial_batch_fields is set - that field is designed for *picking* an
+	existing batch with available stock, not typing a brand-new incoming one,
+	so its auto-suggest finds nothing and clobbers it. Snapshot what was
+	actually typed here (before_validate runs before that clobber) so
+	ensure_batch_with_expiry can restore it afterwards.
+	"""
+	for row in doc.items:
+		row.set("_typed_batch_no", row.batch_no)
+
+
 def ensure_batch_with_expiry(doc, method=None):
 	"""Create the Batch for a freshly typed supplier batch number ourselves,
 	before core tries to auto-create it. Core's own auto-create only sets
 	batch_id + item (no expiry), which hard-fails for items that don't have
-	a Shelf Life set. Creating it here with the row's Expiry Date avoids that,
-	and runs early enough (doc_events "validate") to land before core's own
-	link validation touches the field.
+	a Shelf Life set. Creating it here with the row's Expiry Date avoids that.
 	"""
 	for row in doc.items:
+		typed_batch_no = row.get("_typed_batch_no")
+		if typed_batch_no and not row.batch_no:
+			row.batch_no = typed_batch_no
+
 		if row.batch_no and not frappe.db.exists("Batch", row.batch_no):
 			batch = frappe.new_doc("Batch")
 			batch.batch_id = row.batch_no
