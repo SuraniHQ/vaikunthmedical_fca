@@ -6,3 +6,4 @@
 # Patches added in this section will be executed after doctypes are migrated
 vaikunthmedical_fca.patches.v1_0.create_rack_shelf_inventory_dimensions
 vaikunthmedical_fca.patches.v1_1.set_default_branding_logo
+vaikunthmedical_fca.patches.v1_2.add_grn_expiry_and_mrp_fields

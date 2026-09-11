@@ -147,7 +147,10 @@ required_apps = ["erpnext"]
 doc_events = {
 	"Company": {
 		"validate": "vaikunthmedical_fca.branding.set_company_logo",
-	}
+	},
+	"Purchase Receipt": {
+		"on_submit": "vaikunthmedical_fca.purchase_receipt.sync_batch_expiry_and_selling_price",
+	},
 }
 
 # Scheduled Tasks
