@@ -2,6 +2,24 @@ import frappe
 from frappe.utils import flt
 
 
+def ensure_batch_with_expiry(doc, method=None):
+	"""Create the Batch for a freshly typed supplier batch number ourselves,
+	before core tries to auto-create it. Core's own auto-create only sets
+	batch_id + item (no expiry), which hard-fails for items that don't have
+	a Shelf Life set. Creating it here with the row's Expiry Date avoids that,
+	and runs early enough (doc_events "validate") to land before core's own
+	link validation touches the field.
+	"""
+	for row in doc.items:
+		if row.batch_no and not frappe.db.exists("Batch", row.batch_no):
+			batch = frappe.new_doc("Batch")
+			batch.batch_id = row.batch_no
+			batch.item = row.item_code
+			if row.custom_expiry_date:
+				batch.expiry_date = row.custom_expiry_date
+			batch.insert(ignore_permissions=True)
+
+
 def sync_batch_expiry_and_selling_price(doc, method=None):
 	"""On GRN submission: push each row's Expiry Date onto the batch(es) it
 	received, and roll the row's MRP (entered per Purchase UOM) into the
