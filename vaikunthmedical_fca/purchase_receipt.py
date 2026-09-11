@@ -38,15 +38,23 @@ def ensure_batch_with_expiry(doc, method=None):
 def sync_batch_expiry_and_selling_price(doc, method=None):
 	"""On GRN submission: push each row's Expiry Date onto the batch(es) it
 	received, and roll the row's MRP (entered per Purchase UOM) into the
-	default Selling Price List, converted to Stock UOM.
+	default Selling Price List, converted to Stock UOM. When the row has a
+	batch, the price is recorded against that batch specifically, so
+	different batches of the same item can carry different selling prices.
 	"""
 	for row in doc.items:
+		batch_nos = _get_row_batch_nos(row)
+
 		if row.custom_expiry_date:
-			for batch_no in _get_row_batch_nos(row):
+			for batch_no in batch_nos:
 				_set_batch_expiry(batch_no, row.custom_expiry_date)
 
 		if row.custom_mrp:
-			_update_selling_price(row)
+			if batch_nos:
+				for batch_no in batch_nos:
+					_update_selling_price(row, batch_no)
+			else:
+				_update_selling_price(row)
 
 
 def _get_row_batch_nos(row):
@@ -69,12 +77,13 @@ def _set_batch_expiry(batch_no, expiry_date):
 		frappe.db.set_value("Batch", batch_no, "expiry_date", expiry_date)
 
 
-def _update_selling_price(row):
+def _update_selling_price(row, batch_no=None):
 	price_list = frappe.db.get_single_value("Selling Settings", "selling_price_list")
 	if not price_list:
 		return
 
 	rate_in_stock_uom = flt(row.custom_mrp) / flt(row.conversion_factor or 1)
+	batch_no = batch_no or ""
 
 	existing = frappe.db.get_value(
 		"Item Price",
@@ -83,6 +92,7 @@ def _update_selling_price(row):
 			"price_list": price_list,
 			"uom": row.stock_uom,
 			"selling": 1,
+			"batch_no": batch_no,
 		},
 		"name",
 	)
@@ -97,6 +107,7 @@ def _update_selling_price(row):
 				"price_list": price_list,
 				"uom": row.stock_uom,
 				"selling": 1,
+				"batch_no": batch_no,
 				"price_list_rate": rate_in_stock_uom,
 			}
 		).insert(ignore_permissions=True)
