@@ -41,10 +41,21 @@ def apply_scm_to_rate(doc, method=None):
 	from the already-reduced Rate rather than the original gross rate; for
 	the normal flow - enter qty/rate/discount%/SCM once, then save/submit -
 	this isn't hit.
+
+	This is a doc_events hook (hooks.py -> before_validate), not a client
+	script, so it runs identically for every entry path - desk UI, REST
+	API, Data Import Tool, bench console - there is no client-side-only
+	code path to bypass. It also validates: SCM can't be negative (that's
+	a surcharge, not a discount), and SCM can't exceed the post-Discount %
+	amount for the row (which would drive the line negative).
 	"""
 	for row in doc.items:
-		if not flt(row.custom_scm_amount):
+		scm = flt(row.custom_scm_amount)
+		if not scm:
 			continue
+
+		if scm < 0:
+			frappe.throw(f"Row #{row.idx} ({row.item_code}): SCM cannot be negative.")
 
 		qty = flt(row.qty) or 1
 		discount_percentage = flt(row.discount_percentage)
@@ -54,7 +65,14 @@ def apply_scm_to_rate(doc, method=None):
 		elif not flt(row.price_list_rate):
 			row.price_list_rate = flt(row.rate)
 
-		row.rate = flt(row.price_list_rate) - (flt(row.custom_scm_amount) / qty)
+		amount_after_discount = flt(row.price_list_rate) * qty
+		if scm > amount_after_discount:
+			frappe.throw(
+				f"Row #{row.idx} ({row.item_code}): SCM ({scm}) cannot exceed the line amount "
+				f"after Discount % ({amount_after_discount})."
+			)
+
+		row.rate = flt(row.price_list_rate) - (scm / qty)
 
 
 def set_total_scm_amount(doc, method=None):
