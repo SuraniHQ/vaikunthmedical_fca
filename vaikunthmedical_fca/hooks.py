@@ -158,7 +158,10 @@ doc_events = {
 			"vaikunthmedical_fca.scm.apply_scm_to_rate",
 			"vaikunthmedical_fca.scm.set_total_scm_amount",
 		],
-		"validate": "vaikunthmedical_fca.purchase_receipt.ensure_batch_with_expiry",
+		"validate": [
+			"vaikunthmedical_fca.purchase_receipt.ensure_batch_with_expiry",
+			"vaikunthmedical_fca.scm.apply_row_wise_discount_after_tax",
+		],
 		"on_submit": "vaikunthmedical_fca.purchase_receipt.sync_batch_expiry_and_selling_price",
 	},
 	"Purchase Invoice": {
@@ -166,6 +169,7 @@ doc_events = {
 			"vaikunthmedical_fca.scm.apply_scm_to_rate",
 			"vaikunthmedical_fca.scm.set_total_scm_amount",
 		],
+		"validate": "vaikunthmedical_fca.scm.apply_row_wise_discount_after_tax",
 	},
 }
 
