@@ -31,11 +31,14 @@ def apply_scm_to_rate(doc, method=None):
 	after saving) would otherwise reread a discount_percentage core has
 	already reset to 0. So the *first* pass where discount_percentage is
 	still genuinely non-zero freezes the post-discount, pre-SCM rate into
-	price_list_rate as a stable anchor; once discount_percentage reads back
+	price_list_rate as a stable anchor (and mirrors the entered percentage
+	into the read-only custom_disc_percent_entered, since the native field
+	itself is about to go back to 0); once discount_percentage reads back
 	as 0 (core's reset, not the user clearing it), that anchor is reused
 	instead of recomputed. Rate/Amount/tax math stays correct across
 	however many times the document validates - only Discount % as
-	displayed goes to 0.
+	displayed goes to 0, with custom_disc_percent_entered showing what was
+	actually typed instead.
 
 	Editing Discount % again after SCM has already been applied re-anchors
 	from the already-reduced Rate rather than the original gross rate; for
@@ -62,6 +65,7 @@ def apply_scm_to_rate(doc, method=None):
 
 		if discount_percentage:
 			row.price_list_rate = flt(row.rate) * (1 - discount_percentage / 100.0)
+			row.custom_disc_percent_entered = discount_percentage
 		elif not flt(row.price_list_rate):
 			row.price_list_rate = flt(row.rate)
 
