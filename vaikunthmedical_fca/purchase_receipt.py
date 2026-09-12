@@ -1,5 +1,37 @@
+import calendar
+import re
+from datetime import date
+
 import frappe
 from frappe.utils import flt
+
+_MONTH_YEAR_PATTERN = re.compile(r"^\s*(\d{1,2})[-/](\d{2}|\d{4})\s*$")
+
+
+def apply_expiry_month_year(doc, method=None):
+	"""Let the GRN row's Expiry Date be entered as just MM-YY, the way it's
+	printed on most medicine packaging, and expand it to the last calendar
+	day of that month - the conventional reading of a printed MM/YY expiry.
+	"""
+	for row in doc.items:
+		month_year = row.get("custom_expiry_month_year")
+		if not month_year:
+			continue
+
+		match = _MONTH_YEAR_PATTERN.match(str(month_year))
+		if not match:
+			frappe.throw(f"Row #{row.idx}: Expiry (MM-YY) {month_year!r} is not in MM-YY format, e.g. 12-26")
+
+		month = int(match.group(1))
+		year = int(match.group(2))
+		if year < 100:
+			year += 2000
+
+		if not 1 <= month <= 12:
+			frappe.throw(f"Row #{row.idx}: {month_year!r} is not a valid month")
+
+		last_day = calendar.monthrange(year, month)[1]
+		row.custom_expiry_date = date(year, month, last_day)
 
 
 def snapshot_typed_batch_no(doc, method=None):

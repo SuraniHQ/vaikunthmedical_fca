@@ -10,3 +10,4 @@ vaikunthmedical_fca.patches.v1_2.add_grn_expiry_and_mrp_fields
 vaikunthmedical_fca.patches.v1_3.default_to_simple_batch_entry_on_grn
 vaikunthmedical_fca.patches.v1_4.simplify_grn_batch_and_mrp_fields
 vaikunthmedical_fca.patches.v1_5.pick_batches_by_expiry_fefo
+vaikunthmedical_fca.patches.v1_6.add_expiry_month_year_field

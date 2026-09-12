@@ -149,7 +149,10 @@ doc_events = {
 		"validate": "vaikunthmedical_fca.branding.set_company_logo",
 	},
 	"Purchase Receipt": {
-		"before_validate": "vaikunthmedical_fca.purchase_receipt.snapshot_typed_batch_no",
+		"before_validate": [
+			"vaikunthmedical_fca.purchase_receipt.apply_expiry_month_year",
+			"vaikunthmedical_fca.purchase_receipt.snapshot_typed_batch_no",
+		],
 		"validate": "vaikunthmedical_fca.purchase_receipt.ensure_batch_with_expiry",
 		"on_submit": "vaikunthmedical_fca.purchase_receipt.sync_batch_expiry_and_selling_price",
 	},
