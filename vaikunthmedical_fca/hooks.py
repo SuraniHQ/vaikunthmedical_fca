@@ -43,7 +43,10 @@ required_apps = ["erpnext"]
 # page_js = {"page" : "public/js/file.js"}
 
 # include js in doctype views
-# doctype_js = {"doctype" : "public/js/doctype.js"}
+doctype_js = {
+	"Purchase Receipt": "public/js/scm.js",
+	"Purchase Invoice": "public/js/scm.js",
+}
 # doctype_list_js = {"doctype" : "public/js/doctype_list.js"}
 # doctype_tree_js = {"doctype" : "public/js/doctype_tree.js"}
 # doctype_calendar_js = {"doctype" : "public/js/doctype_calendar.js"}
@@ -152,9 +155,17 @@ doc_events = {
 		"before_validate": [
 			"vaikunthmedical_fca.purchase_receipt.apply_expiry_month_year",
 			"vaikunthmedical_fca.purchase_receipt.snapshot_typed_batch_no",
+			"vaikunthmedical_fca.scm.apply_scm_to_rate",
+			"vaikunthmedical_fca.scm.set_total_scm_amount",
 		],
 		"validate": "vaikunthmedical_fca.purchase_receipt.ensure_batch_with_expiry",
 		"on_submit": "vaikunthmedical_fca.purchase_receipt.sync_batch_expiry_and_selling_price",
+	},
+	"Purchase Invoice": {
+		"before_validate": [
+			"vaikunthmedical_fca.scm.apply_scm_to_rate",
+			"vaikunthmedical_fca.scm.set_total_scm_amount",
+		],
 	},
 }
 
