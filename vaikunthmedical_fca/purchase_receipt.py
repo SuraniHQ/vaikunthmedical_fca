@@ -35,46 +35,25 @@ def apply_expiry_month_year(doc, method=None):
 
 
 def apply_scheme_amount(doc, method=None):
-	"""Let "Scm" (a flat per-line scheme/promotional discount) reduce Amount
-	directly, leaving Rate exactly as entered. Runs after core's own
-	calculate_taxes_and_totals(), which recomputes Amount/Net Amount and the
-	document totals fresh from qty x rate on *every* validate - unlike Rate,
-	Amount never "remembers" a previous reduction between saves, so the full
-	Scm value is subtracted from that fresh baseline every time, not just
-	the change since the last save (there's nothing to double-count against).
-
-	Note: this does not re-run tax calculation, so if Purchase Taxes and
-	Charges are configured, tax amounts stay based on the pre-Scm value.
+	"""Let "Scm" (a flat per-line scheme/promotional discount) reduce Amount.
+	Amount is always qty x Rate in ERPNext - it can't be adjusted on its own -
+	so Rate is what actually has to move for Amount to come out as
+	(qty x rate) - Scm. Compares against the previously *saved* Scm (not the
+	raw value on the row) so re-saving a draft without changing Scm doesn't
+	subtract it again.
 	"""
-	conversion_rate = flt(doc.conversion_rate) or 1
-	total_scm = 0.0
-	total_base_scm = 0.0
+	before = doc.get_doc_before_save()
+	before_rows = {d.name: d for d in before.items} if before else {}
 
 	for row in doc.items:
-		scm = flt(row.custom_scm)
-		if scm:
-			base_scm = scm * conversion_rate
+		old_row = before_rows.get(row.name)
+		old_scm = flt(old_row.custom_scm) if old_row else 0
+		new_scm = flt(row.custom_scm)
+		delta = new_scm - old_scm
 
-			row.amount = flt(row.amount) - scm
-			row.net_amount = flt(row.net_amount) - scm
-			row.base_amount = flt(row.base_amount) - base_scm
-			row.base_net_amount = flt(row.base_net_amount) - base_scm
-
-			total_scm += scm
-			total_base_scm += base_scm
-
-	if total_scm:
-		doc.total = flt(doc.total) - total_scm
-		doc.net_total = flt(doc.net_total) - total_scm
-		doc.grand_total = flt(doc.grand_total) - total_scm
-		if doc.rounded_total:
-			doc.rounded_total = flt(doc.rounded_total) - total_scm
-
-		doc.base_total = flt(doc.base_total) - total_base_scm
-		doc.base_net_total = flt(doc.base_net_total) - total_base_scm
-		doc.base_grand_total = flt(doc.base_grand_total) - total_base_scm
-		if doc.base_rounded_total:
-			doc.base_rounded_total = flt(doc.base_rounded_total) - total_base_scm
+		if delta:
+			qty = flt(row.qty) or 1
+			row.rate = flt(row.rate) - (delta / qty)
 
 
 def snapshot_typed_batch_no(doc, method=None):
