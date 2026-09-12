@@ -2,53 +2,61 @@ import frappe
 from frappe.utils import flt
 
 
-def apply_scm_amount(doc, method=None):
-	"""Let "SCM" reduce Amount directly. Rate and Discount % are left
-	completely untouched - Discount % already reduces Amount correctly on
-	its own via core's native handling, since we never touch Rate or
-	Price List Rate. Runs in "validate", after core's own
-	calculate_taxes_and_totals() has already computed Amount/Net Amount
-	(reflecting Discount % on its own) fresh from qty x rate - Amount is
-	recomputed by core from scratch on *every* validate, so the full SCM
-	value is subtracted from that fresh baseline every time, not just the
-	change since the last save (there's nothing to double-count against).
+def apply_scm_to_rate(doc, method=None):
+	"""Let "SCM" (a flat per-line scheme discount, on top of Discount %) reduce
+	Rate further, applied pre-tax - so GST calculates on the post-discount,
+	post-SCM amount, matching how supplier invoices with a scheme line
+	usually compute GST themselves (GST on Net Value, where Net Value is
+	Goods Value minus both the % discount and the scheme value).
 
-	Note: because Rate/Price List Rate are never touched, core calculates
-	GST/tax rows *before* this SCM deduction is applied, so tax ends up
-	computed on the pre-SCM amount rather than the discounted one. That's
-	a known trade-off of keeping Rate/Price List Rate untouched.
+	Runs in before_validate, ahead of core's own discount_percentage/
+	pricing-rule reconciliation and tax calculation. Only touches rows
+	where SCM is actually used - a plain Discount % row with no SCM is
+	left entirely to core's native handling.
+
+	Expects the normal ERPNext input pattern: Price List Rate populated
+	(typed directly, or fetched from a Buying Price List) with Discount %,
+	Rate left for core to derive - not Rate typed directly. Price List Rate
+	itself is never modified here, only read.
+
+	Rate is a persisted field, so a naive per-save delta on SCM alone would
+	either double-subtract on resave, or (since discount_percentage is a
+	percentage, not a flat amount) compound incorrectly if combined the
+	same way. Instead, custom_scm_rate_anchor (hidden) holds "Price List
+	Rate x (1 - discount% / 100)", frozen once, and Rate is recomputed
+	fresh from it every time: anchor - SCM / qty. That's stateless and
+	idempotent - re-saving without changes, or changing SCM later, always
+	recomputes correctly with no drift.
+
+	Known trade-off: because our Rate no longer matches what core's own
+	reconciliation would derive from Price List Rate/Discount % alone, core
+	resets the *displayed* Discount % to 0 after save (folding the
+	equivalent reduction into Rate/margin instead) whenever SCM is also
+	present on the row - which would also erase our own reference to what
+	the user asked for, since a later validate pass (e.g. submitting right
+	after saving) would otherwise reread a discount_percentage core has
+	already reset to 0. So the *first* pass where discount_percentage is
+	still genuinely non-zero freezes the anchor; once discount_percentage
+	reads back as 0 (core's reset, not the user clearing it), that anchor
+	is reused instead of recomputed. Rate/Amount/tax math stays correct
+	across however many times the document validates - only Discount % as
+	displayed goes to 0.
 	"""
-	conversion_rate = flt(doc.conversion_rate) or 1
-	total_scm = 0.0
-	total_base_scm = 0.0
-
 	for row in doc.items:
 		scm = flt(row.custom_scm_amount)
 		if not scm:
 			continue
 
-		base_scm = scm * conversion_rate
+		qty = flt(row.qty) or 1
+		discount_percentage = flt(row.discount_percentage)
 
-		row.amount = flt(row.amount) - scm
-		row.net_amount = flt(row.net_amount) - scm
-		row.base_amount = flt(row.base_amount) - base_scm
-		row.base_net_amount = flt(row.base_net_amount) - base_scm
+		if discount_percentage:
+			price_list_rate = flt(row.price_list_rate) or flt(row.rate)
+			row.custom_scm_rate_anchor = price_list_rate * (1 - discount_percentage / 100.0)
+		elif not flt(row.custom_scm_rate_anchor):
+			row.custom_scm_rate_anchor = flt(row.price_list_rate) or flt(row.rate)
 
-		total_scm += scm
-		total_base_scm += base_scm
-
-	if total_scm:
-		doc.total = flt(doc.total) - total_scm
-		doc.net_total = flt(doc.net_total) - total_scm
-		doc.grand_total = flt(doc.grand_total) - total_scm
-		if doc.rounded_total:
-			doc.rounded_total = flt(doc.rounded_total) - total_scm
-
-		doc.base_total = flt(doc.base_total) - total_base_scm
-		doc.base_net_total = flt(doc.base_net_total) - total_base_scm
-		doc.base_grand_total = flt(doc.base_grand_total) - total_base_scm
-		if doc.base_rounded_total:
-			doc.base_rounded_total = flt(doc.base_rounded_total) - total_base_scm
+		row.rate = flt(row.custom_scm_rate_anchor) - (scm / qty)
 
 
 def set_total_scm_amount(doc, method=None):
