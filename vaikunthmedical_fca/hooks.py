@@ -155,7 +155,7 @@ doc_events = {
 		],
 		"validate": [
 			"vaikunthmedical_fca.purchase_receipt.ensure_batch_with_expiry",
-			"vaikunthmedical_fca.purchase_receipt.apply_scheme_and_discount",
+			"vaikunthmedical_fca.purchase_receipt.apply_scheme_amount",
 		],
 		"on_submit": "vaikunthmedical_fca.purchase_receipt.sync_batch_expiry_and_selling_price",
 	},
