@@ -34,28 +34,6 @@ def apply_expiry_month_year(doc, method=None):
 		row.custom_expiry_date = date(year, month, last_day)
 
 
-def apply_scheme_amount(doc, method=None):
-	"""Let "Scm" (a flat per-line scheme/promotional discount) reduce Amount.
-	Amount is always qty x Rate in ERPNext - it can't be adjusted on its own -
-	so Rate is what actually has to move for Amount to come out as
-	(qty x rate) - Scm. Compares against the previously *saved* Scm (not the
-	raw value on the row) so re-saving a draft without changing Scm doesn't
-	subtract it again.
-	"""
-	before = doc.get_doc_before_save()
-	before_rows = {d.name: d for d in before.items} if before else {}
-
-	for row in doc.items:
-		old_row = before_rows.get(row.name)
-		old_scm = flt(old_row.custom_scm) if old_row else 0
-		new_scm = flt(row.custom_scm)
-		delta = new_scm - old_scm
-
-		if delta:
-			qty = flt(row.qty) or 1
-			row.rate = flt(row.rate) - (delta / qty)
-
-
 def snapshot_typed_batch_no(doc, method=None):
 	"""Core's set_missing_item_details() (part of the base validate() chain)
 	overwrites a manually typed Batch No back to blank whenever
