@@ -12,4 +12,3 @@ vaikunthmedical_fca.patches.v1_4.simplify_grn_batch_and_mrp_fields
 vaikunthmedical_fca.patches.v1_5.pick_batches_by_expiry_fefo
 vaikunthmedical_fca.patches.v1_6.add_expiry_month_year_field
 vaikunthmedical_fca.patches.v1_9.add_scm_fields
-vaikunthmedical_fca.patches.v1_10.add_disc_percent_entered_field
