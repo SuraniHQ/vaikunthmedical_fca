@@ -10,9 +10,14 @@ def apply_scm_to_rate(doc, method=None):
 	Goods Value minus both the % discount and the scheme value).
 
 	Runs in before_validate, ahead of core's own discount_percentage/
-	pricing-rule reconciliation and tax calculation. Only touches rows
-	where SCM is actually used - a plain Discount % row with no SCM is
-	left entirely to core's native handling.
+	pricing-rule reconciliation and tax calculation. Handles a row as soon
+	as either SCM or Discount % is used - core's own native handling of
+	Discount % alone only works when Rate is left blank for core to
+	derive; once Rate already holds a value (e.g. carried over from a
+	previous save, or fetched from a Buying Price List alongside Price
+	List Rate), core's reconciliation discards the discount the same way
+	it would if we'd touched Rate ourselves. So this takes over for any
+	row using either field, not just rows combining both.
 
 	Expects the normal ERPNext input pattern: Price List Rate populated
 	(typed directly, or fetched from a Buying Price List) with Discount %,
@@ -44,11 +49,11 @@ def apply_scm_to_rate(doc, method=None):
 	"""
 	for row in doc.items:
 		scm = flt(row.custom_scm_amount)
-		if not scm:
+		discount_percentage = flt(row.discount_percentage)
+		if not scm and not discount_percentage and not flt(row.custom_scm_rate_anchor):
 			continue
 
 		qty = flt(row.qty) or 1
-		discount_percentage = flt(row.discount_percentage)
 
 		if discount_percentage:
 			price_list_rate = flt(row.price_list_rate) or flt(row.rate)
