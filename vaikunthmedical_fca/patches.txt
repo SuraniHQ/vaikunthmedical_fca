@@ -13,3 +13,4 @@ vaikunthmedical_fca.patches.v1_5.pick_batches_by_expiry_fefo
 vaikunthmedical_fca.patches.v1_6.add_expiry_month_year_field
 vaikunthmedical_fca.patches.v1_9.add_scm_fields
 vaikunthmedical_fca.patches.v1_11.add_scm_rate_anchor_field
+vaikunthmedical_fca.patches.v1_12.add_disc_percent_anchor_field

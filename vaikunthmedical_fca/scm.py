@@ -2,61 +2,71 @@ import frappe
 from frappe.utils import flt
 
 
-def apply_scm_to_rate(doc, method=None):
-	"""Let "SCM" (a flat per-line scheme discount, on top of Discount %) reduce
-	Rate further, applied pre-tax - so GST calculates on the post-discount,
-	post-SCM amount, matching how supplier invoices with a scheme line
-	usually compute GST themselves (GST on Net Value, where Net Value is
-	Goods Value minus both the % discount and the scheme value).
-
-	Runs in before_validate, ahead of core's own discount_percentage/
-	pricing-rule reconciliation and tax calculation. Only touches rows
-	where SCM is actually used - a plain Discount % row with no SCM is
-	left entirely to core's native handling.
-
-	Expects the normal ERPNext input pattern: Price List Rate populated
-	(typed directly, or fetched from a Buying Price List) with Discount %,
-	Rate left for core to derive - not Rate typed directly. Price List Rate
-	itself is never modified here, only read.
-
-	Rate is a persisted field, so a naive per-save delta on SCM alone would
-	either double-subtract on resave, or (since discount_percentage is a
-	percentage, not a flat amount) compound incorrectly if combined the
-	same way. Instead, custom_scm_rate_anchor (hidden) holds "Price List
-	Rate x (1 - discount% / 100)", frozen once, and Rate is recomputed
-	fresh from it every time: anchor - SCM / qty. That's stateless and
-	idempotent - re-saving without changes, or changing SCM later, always
-	recomputes correctly with no drift.
-
-	Known trade-off: because our Rate no longer matches what core's own
-	reconciliation would derive from Price List Rate/Discount % alone, core
-	resets the *displayed* Discount % to 0 after save (folding the
-	equivalent reduction into Rate/margin instead) whenever SCM is also
-	present on the row - which would also erase our own reference to what
-	the user asked for, since a later validate pass (e.g. submitting right
-	after saving) would otherwise reread a discount_percentage core has
-	already reset to 0. So the *first* pass where discount_percentage is
-	still genuinely non-zero freezes the anchor; once discount_percentage
-	reads back as 0 (core's reset, not the user clearing it), that anchor
-	is reused instead of recomputed. Rate/Amount/tax math stays correct
-	across however many times the document validates - only Discount % as
-	displayed goes to 0.
+def neutralize_discount_percentage(doc, method=None):
+	"""Freeze whatever Discount % was typed into a hidden anchor, then zero
+	the native field before core ever processes it. Core's own Discount %
+	handling works by reducing Rate (via Price List Rate), so zeroing it
+	before core's validate() runs means core never touches Rate at all.
+	Runs in before_validate, ahead of core's own reconciliation - the
+	*first* pass where discount_percentage is still genuinely non-zero
+	freezes the anchor; on later passes it already reads 0 (from us, not
+	the user clearing it), so the existing anchor is left alone.
 	"""
 	for row in doc.items:
-		scm = flt(row.custom_scm_amount)
-		if not scm:
-			continue
-
-		qty = flt(row.qty) or 1
 		discount_percentage = flt(row.discount_percentage)
-
 		if discount_percentage:
-			price_list_rate = flt(row.price_list_rate) or flt(row.rate)
-			row.custom_scm_rate_anchor = price_list_rate * (1 - discount_percentage / 100.0)
-		elif not flt(row.custom_scm_rate_anchor):
-			row.custom_scm_rate_anchor = flt(row.price_list_rate) or flt(row.rate)
+			row.custom_disc_percent_anchor = discount_percentage
+			row.discount_percentage = 0
 
-		row.rate = flt(row.custom_scm_rate_anchor) - (scm / qty)
+
+def apply_scm_and_discount_to_amount(doc, method=None):
+	"""Let Discount % (frozen in custom_disc_percent_anchor) and SCM both
+	reduce Amount directly - Rate is never touched by either. Runs in
+	"validate", after core has already computed Amount fresh from
+	qty x rate (unaffected by Discount %, since neutralize_discount_
+	percentage zeroed the native field before core's calculation ran).
+	Amount is recomputed by core from scratch on *every* validate, so the
+	full deduction is computed fresh every time here too - nothing to
+	double-count against.
+
+	Note: since Rate is never touched, core calculates GST/tax rows on
+	the full, undiscounted amount - not the amount after Discount % or
+	SCM. Deliberate trade-off: GST will not match a supplier invoice that
+	charges GST on the discounted value.
+	"""
+	conversion_rate = flt(doc.conversion_rate) or 1
+	total_deduction = 0.0
+	total_base_deduction = 0.0
+
+	for row in doc.items:
+		base_amount = flt(row.amount)
+		discount_value = base_amount * flt(row.custom_disc_percent_anchor) / 100.0
+		scm = flt(row.custom_scm_amount)
+		deduction = discount_value + scm
+
+		if deduction:
+			base_deduction = deduction * conversion_rate
+
+			row.amount = base_amount - deduction
+			row.net_amount = flt(row.net_amount) - deduction
+			row.base_amount = flt(row.base_amount) - base_deduction
+			row.base_net_amount = flt(row.base_net_amount) - base_deduction
+
+			total_deduction += deduction
+			total_base_deduction += base_deduction
+
+	if total_deduction:
+		doc.total = flt(doc.total) - total_deduction
+		doc.net_total = flt(doc.net_total) - total_deduction
+		doc.grand_total = flt(doc.grand_total) - total_deduction
+		if doc.rounded_total:
+			doc.rounded_total = flt(doc.rounded_total) - total_deduction
+
+		doc.base_total = flt(doc.base_total) - total_base_deduction
+		doc.base_net_total = flt(doc.base_net_total) - total_base_deduction
+		doc.base_grand_total = flt(doc.base_grand_total) - total_base_deduction
+		if doc.base_rounded_total:
+			doc.base_rounded_total = flt(doc.base_rounded_total) - total_base_deduction
 
 
 def set_total_scm_amount(doc, method=None):
