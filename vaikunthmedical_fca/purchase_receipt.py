@@ -34,47 +34,55 @@ def apply_expiry_month_year(doc, method=None):
 		row.custom_expiry_date = date(year, month, last_day)
 
 
-def apply_scheme_amount(doc, method=None):
-	"""Let "Scm" (a flat per-line scheme/promotional discount) reduce Amount
-	directly, leaving Rate exactly as entered. Runs after core's own
-	calculate_taxes_and_totals(), which recomputes Amount/Net Amount and the
-	document totals fresh from qty x rate on *every* validate - unlike Rate,
-	Amount never "remembers" a previous reduction between saves, so the full
-	Scm value is subtracted from that fresh baseline every time, not just
-	the change since the last save (there's nothing to double-count against).
+def apply_scheme_and_discount(doc, method=None):
+	"""Let "Scm" (a flat per-line scheme/promotional discount) and "Dis %"
+	(a percentage discount) both reduce Amount directly, leaving Rate exactly
+	as entered - either one alone, or both together on the same row. Runs
+	after core's own calculate_taxes_and_totals(), which recomputes Amount/
+	Net Amount and the document totals fresh from qty x rate on *every*
+	validate - unlike Rate, Amount never "remembers" a previous reduction
+	between saves, so the full deduction is computed from that fresh
+	baseline every time, not just the change since the last save (there's
+	nothing to double-count against). Dis % is applied against the same
+	fresh baseline as Scm, not against Scm's already-reduced amount, so the
+	two don't compound into each other.
 
 	Note: this does not re-run tax calculation, so if Purchase Taxes and
-	Charges are configured, tax amounts stay based on the pre-Scm value.
+	Charges are configured, tax amounts stay based on the pre-deduction value.
 	"""
 	conversion_rate = flt(doc.conversion_rate) or 1
-	total_scm = 0.0
-	total_base_scm = 0.0
+	total_deduction = 0.0
+	total_base_deduction = 0.0
 
 	for row in doc.items:
+		base_amount = flt(row.amount)
 		scm = flt(row.custom_scm)
-		if scm:
-			base_scm = scm * conversion_rate
+		discount_amount = base_amount * flt(row.custom_dis_percent) / 100.0
+		deduction = scm + discount_amount
 
-			row.amount = flt(row.amount) - scm
-			row.net_amount = flt(row.net_amount) - scm
-			row.base_amount = flt(row.base_amount) - base_scm
-			row.base_net_amount = flt(row.base_net_amount) - base_scm
+		if deduction:
+			base_deduction = deduction * conversion_rate
 
-			total_scm += scm
-			total_base_scm += base_scm
+			row.amount = base_amount - deduction
+			row.net_amount = flt(row.net_amount) - deduction
+			row.base_amount = flt(row.base_amount) - base_deduction
+			row.base_net_amount = flt(row.base_net_amount) - base_deduction
 
-	if total_scm:
-		doc.total = flt(doc.total) - total_scm
-		doc.net_total = flt(doc.net_total) - total_scm
-		doc.grand_total = flt(doc.grand_total) - total_scm
+			total_deduction += deduction
+			total_base_deduction += base_deduction
+
+	if total_deduction:
+		doc.total = flt(doc.total) - total_deduction
+		doc.net_total = flt(doc.net_total) - total_deduction
+		doc.grand_total = flt(doc.grand_total) - total_deduction
 		if doc.rounded_total:
-			doc.rounded_total = flt(doc.rounded_total) - total_scm
+			doc.rounded_total = flt(doc.rounded_total) - total_deduction
 
-		doc.base_total = flt(doc.base_total) - total_base_scm
-		doc.base_net_total = flt(doc.base_net_total) - total_base_scm
-		doc.base_grand_total = flt(doc.base_grand_total) - total_base_scm
+		doc.base_total = flt(doc.base_total) - total_base_deduction
+		doc.base_net_total = flt(doc.base_net_total) - total_base_deduction
+		doc.base_grand_total = flt(doc.base_grand_total) - total_base_deduction
 		if doc.base_rounded_total:
-			doc.base_rounded_total = flt(doc.base_rounded_total) - total_base_scm
+			doc.base_rounded_total = flt(doc.base_rounded_total) - total_base_deduction
 
 
 def snapshot_typed_batch_no(doc, method=None):
